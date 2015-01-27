@@ -234,6 +234,7 @@ class Request(object):
         set in the login and logout functions.
         """
         self._user = value
+        self._request.user = self._user
 
     @property
     def auth(self):
@@ -252,6 +253,7 @@ class Request(object):
         request, such as an authentication token.
         """
         self._auth = value
+        self._request.auth = self._auth
 
     @property
     def successful_authenticator(self):
@@ -406,6 +408,7 @@ class Request(object):
             if user_auth_tuple is not None:
                 self._authenticator = authenticator
                 self._user, self._auth = user_auth_tuple
+                self._set_request_properties()
                 return
 
         self._not_authenticated()
@@ -428,6 +431,15 @@ class Request(object):
             self._auth = api_settings.UNAUTHENTICATED_TOKEN()
         else:
             self._auth = None
+
+        self._set_request_properties()
+
+    def _set_request_properties(self):
+        """
+        Set user and auth properties on underlying request.
+        """
+        self._request.user = self._user
+        self._request.auth = self._auth
 
     def __getattr__(self, attr):
         """

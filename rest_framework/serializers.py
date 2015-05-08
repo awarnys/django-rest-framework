@@ -16,14 +16,13 @@ import datetime
 import inspect
 import types
 from decimal import Decimal
-from django.contrib.contenttypes.generic import GenericForeignKey
 from django.core.paginator import Page
 from django.db import models
 from django.forms import widgets
 from django.utils import six
-from django.utils.datastructures import SortedDict
 from django.utils.functional import cached_property
 from django.core.exceptions import ObjectDoesNotExist
+from rest_framework.compat import SortedDict, GenericForeignKey
 from rest_framework.settings import api_settings
 
 
@@ -110,9 +109,17 @@ class SortedDictWithMetadata(SortedDict):
     """
     A sorted dict-like object, that can have additional properties attached.
     """
+    def __reduce__(self):
+        """
+        Used by pickle (e.g., caching) if OrderedDict is used instead of SortedDict
+        Overriden to remove the metadata from the dict, since it shouldn't be
+        pickle and may in some instances be unpickleable.
+        """
+        return self.__class__, (SortedDict(self), )
+
     def __getstate__(self):
         """
-        Used by pickle (e.g., caching).
+        Used by pickle (e.g., caching) in SortedDict
         Overriden to remove the metadata from the dict, since it shouldn't be
         pickle and may in some instances be unpickleable.
         """
@@ -986,7 +993,11 @@ class ModelSerializer(Serializer):
                 m2m_data[field_name] = attrs.pop(field_name)
 
         # Forward m2m relations
-        for field in meta.many_to_many + meta.virtual_fields:
+        if issubclass(meta.many_to_many.__class__, tuple):
+            temp_m2m = list(meta.many_to_many)
+        else:
+            temp_m2m = meta.many_to_many
+        for field in temp_m2m + meta.virtual_fields:
             if isinstance(field, GenericForeignKey):
                 continue
             if field.name in attrs:
